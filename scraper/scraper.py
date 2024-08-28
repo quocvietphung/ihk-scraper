@@ -34,6 +34,7 @@ def scrape_job_details(job_url):
 
     return {
         "Angebots-Nr.": angebot_nr,
+        "URL": job_url,
         "Schulabschluss wünschenswert": schulabschluss,
         "gewünschte Vorqualifikation": vorqualifikation,
         "Beginn": beginn,
