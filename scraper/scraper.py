@@ -1,6 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
 
+def clean_text(text):
+    """Hàm để làm sạch chuỗi văn bản: xóa các khoảng trắng và ký tự xuống dòng."""
+    return ' '.join(text.split()).replace('(Donau)', '').strip()
 
 def scrape_job_details(job_url):
     """Scrape detailed job information from the job detail page."""
@@ -11,7 +14,13 @@ def scrape_job_details(job_url):
     def safe_extract(label_text):
         element = soup.find('td', text=label_text)
         if element:
-            return element.find_next('td').get_text(strip=True)
+            next_element = element.find_next('td')
+            # Check if the next element contains a list
+            if next_element.find('ul'):
+                list_items = next_element.find_all('li')
+                return ', '.join([li.get_text(strip=True) for li in list_items])
+            else:
+                return clean_text(next_element.get_text(strip=True))
         return "N/A"  # Return "N/A" if the element is not found
 
     # Extract the required details using safe_extract
@@ -22,9 +31,28 @@ def scrape_job_details(job_url):
     plaetze = safe_extract('Angebotene Plätze')
     stellenbeschreibung = safe_extract('Stellenbeschreibung')
 
-    # Tên công ty và email liên hệ
-    unternehmen = soup.find('h3').get_text(strip=True) if soup.find('h3') else "N/A"
-    kontakt = soup.find('p', class_='email').get_text(strip=True) if soup.find('p', class_='email') else "N/A"
+    # Tìm phần "Kontakt"
+    kontakt_info_section = soup.find('div', class_='contactBox')
+
+    # Tìm địa chỉ trong phần "Kontakt"
+    address = "N/A"
+    if kontakt_info_section:
+        address_p = kontakt_info_section.find('p')
+        if address_p:
+            address = clean_text(address_p.get_text(strip=True))
+
+    # Tìm số điện thoại trong phần "Kontakt"
+    tel = "N/A"
+    if kontakt_info_section:
+        tel_p = kontakt_info_section.find('p', text=lambda t: t and 'Tel.' in t)
+        if tel_p:
+            tel = clean_text(tel_p.get_text(strip=True).split(':')[-1].strip())
+
+    # Tìm email trong phần "Kontakt"
+    email = "N/A"
+    email_a = kontakt_info_section.find('a', href=lambda href: href and 'mailto:' in href)
+    if email_a:
+        email = email_a['href'].replace('mailto:', '').strip()
 
     # Lấy thêm các vị trí khác của công ty (nếu có)
     weitere_angebote = []
@@ -40,8 +68,9 @@ def scrape_job_details(job_url):
         "Beginn": beginn,
         "Angebotene Plätze": plaetze,
         "Stellenbeschreibung": stellenbeschreibung,
-        "Unternehmen": unternehmen,
-        "Kontakt": kontakt,
+        "Adresse": address,
+        "Telefon": tel,
+        "Email": email,
         "Weitere Ausbildungsplatzangebote": weitere_angebote
     }
 
