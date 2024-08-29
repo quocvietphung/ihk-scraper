@@ -5,11 +5,11 @@ import csv
 import time
 
 def clean_text(text):
-    """Làm sạch chuỗi văn bản, loại bỏ khoảng trắng thừa và ký tự không cần thiết."""
+    """Clean the text by removing unnecessary spaces and specific terms."""
     return ' '.join(text.split()).replace('(Donau)', '').strip()
 
 def safe_extract(soup, label_text):
-    """Trích xuất thông tin từ một nhãn cụ thể trong trang HTML."""
+    """Safely extract information associated with a specific label from the HTML."""
     element = soup.find('td', text=label_text)
     if element:
         next_element = element.find_next('td')
@@ -21,7 +21,7 @@ def safe_extract(soup, label_text):
     return "N/A"
 
 def extract_contact_info(soup):
-    """Trích xuất thông tin liên hệ từ trang HTML."""
+    """Extract contact information from the contact box in the HTML."""
     contact_info = {"Adresse": "N/A", "Telefon": "N/A", "Email": "N/A"}
 
     contact_section = soup.find('div', class_='contactBox')
@@ -41,13 +41,14 @@ def extract_contact_info(soup):
     return contact_info
 
 def extract_additional_offers(soup):
-    """Trích xuất các đề nghị bổ sung từ trang HTML."""
+    """Extract additional offers from the HTML if available."""
     additional_offers = [link.get_text(strip=True) for link in soup.select('ul.linkList li a')]
     return ', '.join(additional_offers) if additional_offers else 'N/A'
 
 def scrape_job_details(job_url):
-    """Thu thập chi tiết công việc từ URL."""
+    """Scrape job details from a given URL."""
     response = requests.get(job_url)
+    response.encoding = 'utf-8'  # Ensure the response is interpreted as UTF-8
     soup = BeautifulSoup(response.content, 'html.parser')
 
     job_details = OrderedDict([
@@ -59,7 +60,6 @@ def scrape_job_details(job_url):
         ("Angebotene Plätze", safe_extract(soup, 'Angebotene Plätze')),
     ])
 
-    # Thêm thông tin liên hệ và các đề nghị bổ sung
     contact_info = extract_contact_info(soup)
     job_details.update(contact_info)
     job_details["Weitere Ausbildungsplatzangebote"] = extract_additional_offers(soup)
@@ -68,7 +68,7 @@ def scrape_job_details(job_url):
     return job_details
 
 def scrape_job_list(soup):
-    """Thu thập danh sách công việc từ một trang HTML."""
+    """Scrape the list of jobs from the main page HTML."""
     base_url = "https://www.ihk-lehrstellenboerse.de"
     jobs = []
 
@@ -81,8 +81,8 @@ def scrape_job_list(soup):
     return jobs
 
 def scrape_ihk_pages(base_url, total_pages, output_csv):
-    """Duyệt qua tất cả các trang và lưu dữ liệu vào file CSV."""
-    with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
+    """Scrape multiple pages of job listings and save to a CSV file."""
+    with open(output_csv, mode='w', newline='', encoding='utf-8-sig') as file:
         writer = csv.DictWriter(file, delimiter=';', fieldnames=[
             "Angebots-Nr.", "Stellenbeschreibung", "Schulabschluss wünschenswert",
             "gewünschte Vorqualifikation", "Beginn", "Angebotene Plätze", "Adresse",
@@ -105,7 +105,7 @@ def scrape_ihk_pages(base_url, total_pages, output_csv):
             else:
                 print(f"Failed to retrieve page {page_num}")
 
-            time.sleep(1)  # Thời gian chờ giữa các yêu cầu để tránh quá tải server
+            time.sleep(1)  # Pause between requests to avoid overloading the server
 
 if __name__ == "__main__":
     base_url = ('https://www.ihk-lehrstellenboerse.de/angebote/suche?hitsPerPage=10&'
@@ -113,8 +113,8 @@ if __name__ == "__main__":
                 'organisationName=Unternehmen+eingeben&status=1&mode=0&'
                 'dateTypeSelection=LASTCHANGED_DATE&thisYear=true&nextYear=true&afterNextYear=true&distance=0')
 
-    total_pages = 1682  # Tổng số trang cần scrape
-    output_csv = 'ihk_jobs.csv'  # Tên file CSV để lưu kết quả
+    total_pages = 1682  # Total number of pages to scrape
+    output_csv = 'ihk_jobs.csv'  # Name of the output CSV file
 
     scrape_ihk_pages(base_url, total_pages, output_csv)
 
