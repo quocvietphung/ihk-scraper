@@ -1,15 +1,22 @@
 import requests
 from bs4 import BeautifulSoup
 from collections import OrderedDict
+import csv
+import time
+
 
 def clean_text(text):
+    """Hàm để làm sạch chuỗi văn bản: xóa các khoảng trắng và ký tự xuống dòng."""
     return ' '.join(text.split()).replace('(Donau)', '').strip()
 
+
 def scrape_job_details(job_url):
+    """Scrape chi tiết từng công việc từ trang chi tiết."""
     response = requests.get(job_url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
     def safe_extract(label_text):
+        """Hàm phụ để lấy thông tin an toàn từ các thẻ HTML."""
         element = soup.find('td', text=label_text)
         if element:
             next_element = element.find_next('td')
@@ -51,7 +58,7 @@ def scrape_job_details(job_url):
         weitere_angebote.append(link.get_text(strip=True))
     weitere_angebote = ', '.join(weitere_angebote) if weitere_angebote else 'N/A'
 
-    # Sử dụng OrderedDict để đảm bảo thứ tự key
+    # Trả về dữ liệu theo thứ tự định trước
     return OrderedDict([
         ("Angebots-Nr.", angebot_nr),
         ("Stellenbeschreibung", stellenbeschreibung),
@@ -66,17 +73,64 @@ def scrape_job_details(job_url):
         ("URL", job_url)
     ])
 
-def scrape_ihk_data(url):
-    base_url = "https://www.ihk-lehrstellenboerse.de"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
 
-    data = []
+def scrape_job_list(soup):
+    """Scrape danh sách công việc trên một trang."""
+    job_list = []
+    base_url = "https://www.ihk-lehrstellenboerse.de"
 
     for row in soup.select('table tbody tr'):
         relative_link = row.select_one('td:nth-child(1) a')['href']
         job_url = base_url + relative_link
         job_details = scrape_job_details(job_url)
-        data.append(job_details)
+        job_list.append(job_details)
 
-    return data
+    return job_list
+
+
+def scrape_ihk_pages(base_url, total_pages, output_csv):
+    """Duyệt qua tất cả các trang và lưu dữ liệu vào file CSV."""
+    all_data = []
+
+    # Mở file CSV để lưu kết quả
+    with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=[
+            "Angebots-Nr.", "Stellenbeschreibung", "Schulabschluss wünschenswert",
+            "gewünschte Vorqualifikation", "Beginn", "Angebotene Plätze", "Adresse",
+            "Telefon", "Email", "Weitere Ausbildungsplatzangebote", "URL"])
+
+        # Viết tiêu đề cho file CSV
+        writer.writeheader()
+
+        for page_num in range(total_pages + 1):
+            page_url = f"{base_url}&page={page_num}"
+            response = requests.get(page_url)
+
+            if response.status_code != 200:
+                print(f"Failed to retrieve page {page_num}")
+                continue
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+            jobs_on_page = scrape_job_list(soup)
+            all_data.extend(jobs_on_page)
+
+            # Ghi dữ liệu của mỗi trang vào CSV
+            for job in jobs_on_page:
+                writer.writerow(job)
+
+            print(f"Page {page_num} scraped successfully with {len(jobs_on_page)} job listings.")
+            time.sleep(1)  # Thời gian chờ giữa các yêu cầu để tránh quá tải server
+
+    return all_data
+
+
+# Main script execution
+base_url = 'https://www.ihk-lehrstellenboerse.de/angebote/suche?hitsPerPage=10&sortColumn=-1&sortDir=asc&query=Gib+Deinen+Wunschberuf+ein&organisationName=Unternehmen+eingeben&status=1&mode=0&dateTypeSelection=LASTCHANGED_DATE&thisYear=true&nextYear=true&afterNextYear=true&distance=0'
+
+total_pages = 1682  # Tổng số trang
+output_csv = 'ihk_jobs.csv'  # Tên file CSV để lưu kết quả
+
+# Duyệt qua tất cả các trang và lưu kết quả vào file CSV
+scrape_ihk_pages(base_url, total_pages, output_csv)
+
+print(f"Scraping completed. Data saved to {output_csv}.")
