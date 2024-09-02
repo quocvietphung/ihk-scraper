@@ -14,30 +14,39 @@ def safe_extract(soup, label_text):
     element = soup.find('td', text=label_text)
     if element:
         next_element = element.find_next('td')
-        if next_element.find('ul'):
-            list_items = next_element.find_all('li')
-            return ', '.join([li.get_text(strip=True) for li in list_items])
-        else:
-            return clean_text(next_element.get_text(strip=True))
+        if next_element:
+            if next_element.find('ul'):
+                list_items = next_element.find_all('li')
+                return ', '.join([li.get_text(strip=True) for li in list_items])
+            else:
+                return clean_text(next_element.get_text(strip=True))
     return "N/A"
 
 def extract_contact_info(soup):
     """Trích xuất thông tin liên hệ từ hộp liên hệ trong HTML."""
-    contact_info = {"Adresse": "N/A", "Telefon": "N/A", "Email": "N/A"}
+    contact_info = {"Adresse": "N/A", "Telefon": "N/A", "Email": "N/A", "Unternehmen": "N/A"}
 
     contact_section = soup.find('div', class_='contactBox')
     if contact_section:
+        # Trích xuất địa chỉ
         address = contact_section.find('p')
         if address:
             contact_info["Adresse"] = clean_text(address.get_text(strip=True))
 
+        # Trích xuất số điện thoại
         phone = contact_section.find('p', text=lambda t: t and 'Tel.' in t)
         if phone:
             contact_info["Telefon"] = clean_text(phone.get_text(strip=True).replace('Tel.', '').strip())
 
+        # Trích xuất email
         email = contact_section.find('a', href=lambda href: href and 'mailto:' in href)
         if email:
             contact_info["Email"] = email['href'].replace('mailto:', '').strip()
+
+        # Trích xuất tên công ty (Unternehmen)
+        unternehmen = contact_section.find('h3')
+        if unternehmen:
+            contact_info["Unternehmen"] = clean_text(unternehmen.get_text(strip=True))
 
     return contact_info
 
@@ -58,6 +67,8 @@ def scrape_job_details(job_url):
 
             job_details = OrderedDict([
                 ("Angebots-Nr.", safe_extract(soup, 'Angebots-Nr.')),
+                ("Beruf", soup.select_one('table tbody tr td:nth-child(1) a').get_text(strip=True)),
+                ("Unternehmen", safe_extract(soup, "Unternehmen")),
                 ("Stellenbeschreibung", safe_extract(soup, 'Stellenbeschreibung')),
                 ("Schulabschluss wünschenswert", safe_extract(soup, 'Schulabschluss wünschenswert')),
                 ("gewünschte Vorqualifikation", safe_extract(soup, 'gewünschte Vorqualifikation')),
@@ -96,13 +107,14 @@ def scrape_job_list(soup):
 
 def scrape_ihk_pages(base_url, total_pages, output_csv, start_page=1):
     """Scrape nhiều trang danh sách công việc và lưu vào file CSV."""
-    with open(output_csv, mode='w', newline='', encoding='utf-8-sig') as file:
+    with open(output_csv, mode='a', newline='', encoding='utf-8-sig') as file:  # Mở file ở chế độ append
         writer = csv.DictWriter(file, delimiter=';', fieldnames=[
-            "Angebots-Nr.", "Stellenbeschreibung", "Schulabschluss wünschenswert",
+            "Angebots-Nr.", "Beruf", "Unternehmen", "Stellenbeschreibung", "Schulabschluss wünschenswert",
             "gewünschte Vorqualifikation", "Beginn", "Angebotene Plätze", "Adresse",
             "Telefon", "Email", "Weitere Ausbildungsplatzangebote", "URL"])
 
-        writer.writeheader()
+        if file.tell() == 0:  # Chỉ ghi tiêu đề nếu file rỗng
+            writer.writeheader()
 
         for page_num in range(start_page, total_pages + 1):
             page_url = f"{base_url}&page={page_num}"
@@ -130,6 +142,7 @@ if __name__ == "__main__":
     total_pages = 1682  # Tổng số trang cần scrape
     output_csv = 'ihk_jobs.csv'  # Tên file CSV để lưu kết quả
 
-    scrape_ihk_pages(base_url, total_pages, output_csv)
+    # Bắt đầu từ trang 556, vì trang 555 đã được scrape thành công
+    scrape_ihk_pages(base_url, total_pages, output_csv, start_page=556)
 
     print(f"Quá trình scraping đã hoàn tất. Dữ liệu được lưu vào {output_csv}.")
