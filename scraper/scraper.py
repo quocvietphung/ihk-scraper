@@ -22,6 +22,13 @@ def safe_extract(soup, label_text):
                 return clean_text(next_element.get_text(strip=True))
     return "N/A"
 
+def extract_beruf(soup):
+    """Trích xuất thông tin Beruf từ thẻ <td> có chứa thẻ <a>."""
+    beruf_element = soup.find('td').find('a')
+    if beruf_element:
+        return clean_text(beruf_element.get_text(strip=True))
+    return "N/A"
+
 def extract_contact_info(soup):
     """Trích xuất thông tin liên hệ từ hộp liên hệ trong HTML."""
     contact_info = {"Adresse": "N/A", "Telefon": "N/A", "Email": "N/A", "Unternehmen": "N/A"}
@@ -67,7 +74,7 @@ def scrape_job_details(job_url):
 
             job_details = OrderedDict([
                 ("Angebots-Nr.", safe_extract(soup, 'Angebots-Nr.')),
-                ("Beruf", safe_extract(soup, 'Beruf')),
+                ("Beruf", extract_beruf(soup)),  # Sử dụng hàm mới để trích xuất Beruf
                 ("Unternehmen", safe_extract(soup, "Unternehmen")),
                 ("Stellenbeschreibung", safe_extract(soup, 'Stellenbeschreibung')),
                 ("Schulabschluss wünschenswert", safe_extract(soup, 'Schulabschluss wünschenswert')),
