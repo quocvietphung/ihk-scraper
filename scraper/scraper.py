@@ -67,7 +67,7 @@ def scrape_job_details(job_url):
 
             job_details = OrderedDict([
                 ("Angebots-Nr.", safe_extract(soup, 'Angebots-Nr.')),
-                ("Beruf", soup.select_one('table tbody tr td:nth-child(1) a').get_text(strip=True)),
+                ("Beruf", safe_extract(soup, 'Beruf')),
                 ("Unternehmen", safe_extract(soup, "Unternehmen")),
                 ("Stellenbeschreibung", safe_extract(soup, 'Stellenbeschreibung')),
                 ("Schulabschluss wünschenswert", safe_extract(soup, 'Schulabschluss wünschenswert')),
@@ -105,7 +105,7 @@ def scrape_job_list(soup):
 
     return jobs
 
-def scrape_ihk_pages(base_url, total_pages, output_csv, start_page=1):
+def scrape_ihk_pages(base_url, output_csv, start_page=1):
     """Scrape nhiều trang danh sách công việc và lưu vào file CSV."""
     with open(output_csv, mode='a', newline='', encoding='utf-8-sig') as file:  # Mở file ở chế độ append
         writer = csv.DictWriter(file, delimiter=';', fieldnames=[
@@ -116,7 +116,8 @@ def scrape_ihk_pages(base_url, total_pages, output_csv, start_page=1):
         if file.tell() == 0:  # Chỉ ghi tiêu đề nếu file rỗng
             writer.writeheader()
 
-        for page_num in range(start_page, total_pages + 1):
+        page_num = start_page
+        while True:
             page_url = f"{base_url}&page={page_num}"
             response = requests.get(page_url)
 
@@ -124,25 +125,28 @@ def scrape_ihk_pages(base_url, total_pages, output_csv, start_page=1):
                 soup = BeautifulSoup(response.content, 'html.parser')
                 jobs_on_page = scrape_job_list(soup)
 
+                if not jobs_on_page:
+                    print(f"Không có công việc nào được tìm thấy trên trang {page_num}. Dừng scrape.")
+                    break
+
                 for job in jobs_on_page:
                     writer.writerow(job)
 
                 print(f"Trang {page_num} đã được scrape thành công với {len(jobs_on_page)} công việc.")
+                page_num += 1
             else:
                 print(f"Không thể truy cập trang {page_num}")
+                break
 
             time.sleep(1)  # Tạm dừng giữa các yêu cầu để tránh quá tải server
 
 if __name__ == "__main__":
-    base_url = ('https://www.ihk-lehrstellenboerse.de/angebote/suche?hitsPerPage=10&'
-                'sortColumn=-1&sortDir=asc&query=Gib+Deinen+Wunschberuf+ein&'
-                'organisationName=Unternehmen+eingeben&status=1&mode=0&'
-                'dateTypeSelection=LASTCHANGED_DATE&thisYear=true&nextYear=true&afterNextYear=true&distance=0')
+    for beruf in ["Hotelfachfrau", "Koch", "Pflege"]:
+        base_url = (f'https://www.ihk-lehrstellenboerse.de/angebote/suche?hitsPerPage=10&'
+                    f'sortColumn=-1&sortDir=asc&query={beruf}&status=1&mode=0&'
+                    'dateTypeSelection=LASTCHANGED_DATE&thisYear=true&nextYear=true&afterNextYear=true&distance=0')
 
-    total_pages = 1682  # Tổng số trang cần scrape
-    output_csv = 'ihk_jobs.csv'  # Tên file CSV để lưu kết quả
+        output_csv = f'ihk_{beruf.lower()}_jobs.csv'  # Tên file CSV để lưu kết quả
+        scrape_ihk_pages(base_url, output_csv, start_page=1)
 
-    # Bắt đầu từ trang 556, vì trang 555 đã được scrape thành công
-    scrape_ihk_pages(base_url, total_pages, output_csv, start_page=556)
-
-    print(f"Quá trình scraping đã hoàn tất. Dữ liệu được lưu vào {output_csv}.")
+    print("Quá trình scraping đã hoàn tất.")
