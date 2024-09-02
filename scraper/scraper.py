@@ -23,8 +23,8 @@ def safe_extract(soup, label_text):
     return "N/A"
 
 def extract_beruf(soup):
-    """Trích xuất thông tin Beruf từ thẻ <td> có chứa thẻ <a>."""
-    beruf_element = soup.find('td').find('a')
+    """Trích xuất thông tin Beruf từ thẻ <h1>."""
+    beruf_element = soup.find('h1')
     if beruf_element:
         return clean_text(beruf_element.get_text(strip=True))
     return "N/A"
@@ -103,27 +103,31 @@ def scrape_job_list(soup):
     base_url = "https://www.ihk-lehrstellenboerse.de"
     jobs = []
 
-    for row in soup.select('table tbody tr'):
-        relative_link = row.select_one('td:nth-child(1) a')['href']
-        job_url = base_url + relative_link
-        job_details = scrape_job_details(job_url)
-        if job_details:  # Chỉ thêm nếu không có lỗi
-            jobs.append(job_details)
+    rows = soup.select('table tbody tr')
+    if not rows:
+        print("Không tìm thấy công việc nào trong bảng kết quả.")
+    else:
+        for row in rows:
+            relative_link = row.select_one('td:nth-child(1) a')['href']
+            job_url = base_url + relative_link
+            job_details = scrape_job_details(job_url)
+            if job_details:  # Chỉ thêm nếu không có lỗi
+                jobs.append(job_details)
 
     return jobs
 
 def scrape_ihk_pages(base_url, output_csv, start_page=1):
     """Scrape nhiều trang danh sách công việc và lưu vào file CSV."""
-    with open(output_csv, mode='a', newline='', encoding='utf-8-sig') as file:  # Mở file ở chế độ append
+    with open(output_csv, mode='w', newline='', encoding='utf-8-sig') as file:  # Mở file ở chế độ ghi mới (overwrite)
         writer = csv.DictWriter(file, delimiter=';', fieldnames=[
             "Angebots-Nr.", "Beruf", "Unternehmen", "Stellenbeschreibung", "Schulabschluss wünschenswert",
             "gewünschte Vorqualifikation", "Beginn", "Angebotene Plätze", "Adresse",
             "Telefon", "Email", "Weitere Ausbildungsplatzangebote", "URL"])
 
-        if file.tell() == 0:  # Chỉ ghi tiêu đề nếu file rỗng
-            writer.writeheader()
+        writer.writeheader()
 
         page_num = start_page
+        max_jobs_per_page = 10  # Số lượng công việc tối đa trên mỗi trang
         while True:
             page_url = f"{base_url}&page={page_num}"
             response = requests.get(page_url)
@@ -132,8 +136,8 @@ def scrape_ihk_pages(base_url, output_csv, start_page=1):
                 soup = BeautifulSoup(response.content, 'html.parser')
                 jobs_on_page = scrape_job_list(soup)
 
-                if not jobs_on_page:
-                    print(f"Không có công việc nào được tìm thấy trên trang {page_num}. Dừng scrape.")
+                if not jobs_on_page or len(jobs_on_page) < max_jobs_per_page:
+                    print(f"Không còn công việc mới trên trang {page_num}. Dừng scrape và chuyển sang từ khóa tiếp theo.")
                     break
 
                 for job in jobs_on_page:
@@ -142,7 +146,7 @@ def scrape_ihk_pages(base_url, output_csv, start_page=1):
                 print(f"Trang {page_num} đã được scrape thành công với {len(jobs_on_page)} công việc.")
                 page_num += 1
             else:
-                print(f"Không thể truy cập trang {page_num}")
+                print(f"Không thể truy cập trang {page_num}. Dừng scrape.")
                 break
 
             time.sleep(1)  # Tạm dừng giữa các yêu cầu để tránh quá tải server
