@@ -10,25 +10,16 @@ def clean_text(text):
     return ' '.join(text.split()).strip()
 
 def format_phone_number(phone):
-    """Định dạng lại số điện thoại theo yêu cầu của HubSpot và thay thế số 0 đầu tiên bằng +49."""
-
-    # Loại bỏ các ký tự không phải số (nhưng giữ dấu + ở đầu nếu có)
+    """Định dạng lại số điện thoại theo chuẩn Đức và thay thế số 0 đầu tiên bằng +49."""
     digits_only = ''.join(filter(lambda x: x.isdigit() or x == '+', phone))
-
-    # Nếu số điện thoại bắt đầu với số 0, thay thế bằng +49
     if digits_only.startswith('0'):
         digits_only = '+49' + digits_only[1:]
-
-    # Trả về số đã định dạng, chỉ khi có đủ tối thiểu 7 chữ số
     return digits_only if len(digits_only) >= 7 else ""
 
-
 def clean_phone_format(phone):
-    """Loại bỏ các ký tự đặc biệt như khoảng trắng, dấu gạch ngang, gạch chéo."""
-    # Xóa dấu gạch ngang, gạch chéo và khoảng trắng
+    """Loại bỏ các ký tự đặc biệt như khoảng trắng, dấu gạch ngang, gạch chéo và định dạng lại số điện thoại."""
     cleaned_phone = phone.replace('-', '').replace('/', '').replace(' ', '')
     return format_phone_number(cleaned_phone)
-
 
 def safe_extract(soup, label_text):
     """Trích xuất thông tin một cách an toàn dựa trên nhãn từ HTML."""
@@ -43,20 +34,21 @@ def safe_extract(soup, label_text):
                 return clean_text(next_element.get_text(strip=True))
     return ""  # Trả về chuỗi trống nếu không có dữ liệu
 
-def extract_beruf(soup):
-    """Trích xuất thông tin Beruf từ thẻ <h1>."""
-    beruf_element = soup.find('h1')
-    if beruf_element:
-        return clean_text(beruf_element.get_text(strip=True))
+def extract_branche(soup):
+    """Trích xuất thông tin Branche từ thẻ <h1>."""
+    branche_element = soup.find('h1')
+    if branche_element:
+        return clean_text(branche_element.get_text(strip=True))
     return ""  # Trả về chuỗi trống nếu không có dữ liệu
 
 def extract_contact_info(soup):
     """Trích xuất thông tin liên hệ từ hộp liên hệ trong HTML."""
     contact_info = {
         "Adresse": "",
-        "Telefon": "",
+        "Telefonnumer": "",
         "Email": "",
         "Unternehmen": "",
+        "Anrede": "",
         "Vorname": "",
         "Nachname": ""
     }
@@ -72,7 +64,7 @@ def extract_contact_info(soup):
         phone = contact_section.find('p', text=lambda t: t and 'Tel.' in t)
         if phone:
             raw_phone = clean_text(phone.get_text(strip=True).replace('Tel.', '').strip())
-            contact_info["Telefon"] = clean_phone_format(raw_phone)
+            contact_info["Telefonnumer"] = clean_phone_format(raw_phone)
 
         # Trích xuất email
         email = contact_section.find('a', href=lambda href: href and 'mailto:' in href)
@@ -84,16 +76,23 @@ def extract_contact_info(soup):
         if unternehmen:
             contact_info["Unternehmen"] = clean_text(unternehmen.get_text(strip=True))
 
-        # Trích xuất Vorname và Nachname
+        # Trích xuất Anrede, Vorname và Nachname
         person_label = contact_section.find('h3', text=lambda x: "Auf Deine Bewerbung freut sich" in x)
         if person_label:
             person_name = person_label.find_next('p')
             if person_name:
                 full_name = clean_text(person_name.get_text(strip=True))
-                if ' ' in full_name:
-                    contact_info["Vorname"], contact_info["Nachname"] = full_name.split(' ', 1)
+
+                # Tách các phần của tên
+                parts = full_name.split()
+                if len(parts) > 1:
+                    contact_info["Nachname"] = parts[-1]  # Tên cuối cùng là Nachname
+                    contact_info["Vorname"] = ' '.join(parts[:-1])  # Tất cả các từ trước đó là Vorname
+                    if parts[0] in ["Herr", "Frau"]:
+                        contact_info["Anrede"] = parts[0]
+                        contact_info["Vorname"] = ' '.join(parts[1:-1])  # Loại bỏ Anrede khỏi Vorname
                 else:
-                    contact_info["Vorname"] = full_name
+                    contact_info["Vorname"] = full_name  # Nếu chỉ có một từ
 
     return contact_info
 
@@ -114,7 +113,7 @@ def scrape_job_details(job_url):
 
             job_details = OrderedDict([
                 ("Angebots-Nr.", safe_extract(soup, 'Angebots-Nr.')),
-                ("Beruf", extract_beruf(soup)),
+                ("Branche", extract_branche(soup)),
                 ("Unternehmen", safe_extract(soup, "Unternehmen")),
                 ("Stellenbeschreibung", safe_extract(soup, 'Stellenbeschreibung')),
                 ("Schulabschluss wünschenswert", safe_extract(soup, 'Schulabschluss wünschenswert')),
@@ -163,10 +162,10 @@ def scrape_ihk_pages(base_url, output_csv, start_page=0, end_page=1356):
     """Scrape nhiều trang danh sách công việc và lưu vào file CSV."""
     with open(output_csv, mode='w', newline='', encoding='utf-8-sig') as file:
         writer = csv.DictWriter(file, delimiter=';', fieldnames=[
-            "Angebots-Nr.", "Beruf", "Unternehmen", "Stellenbeschreibung",
+            "Angebots-Nr.", "Branche", "Unternehmen", "Stellenbeschreibung",
             "Schulabschluss wünschenswert", "gewünschte Vorqualifikation",
-            "Beginn", "Angebotene Plätze", "Adresse", "Vorname", "Nachname",
-            "Telefon", "Email", "Weitere Ausbildungsplatzangebote", "URL"
+            "Beginn", "Angebotene Plätze", "Adresse", "Anrede", "Vorname", "Nachname",
+            "Telefonnumer", "Email", "Weitere Ausbildungsplatzangebote", "URL"
         ])
 
         writer.writeheader()
@@ -191,7 +190,7 @@ def scrape_ihk_pages(base_url, output_csv, start_page=0, end_page=1356):
                 print(f"Không thể truy cập trang {page_num}. Dừng scrape.")
                 break
 
-            time.sleep(1)  # Tạm dừng giữa các yêu cầu để tránh quá tải server
+            time.sleep(1)
 
 if __name__ == "__main__":
     base_url = 'https://www.ihk-lehrstellenboerse.de/angebote/suche?hitsPerPage=10&sortColumn=-1&sortDir=asc&query=Gib+Deinen+Wunschberuf+ein&organisationName=Unternehmen+eingeben&status=1&mode=0&dateTypeSelection=LASTCHANGED_DATE&thisYear=true&nextYear=true&afterNextYear=true&distance=0'
