@@ -10,11 +10,25 @@ def clean_text(text):
     return ' '.join(text.split()).strip()
 
 def format_phone_number(phone):
-    """Định dạng lại số điện thoại theo chuẩn quốc tế với mã quốc gia."""
-    digits_only = ''.join(filter(str.isdigit, phone))
-    if len(digits_only) >= 7:  # Kiểm tra độ dài tối thiểu của số điện thoại
-        return f'+49{digits_only}'  # Thêm mã quốc gia Đức +49
-    return ""
+    """Định dạng lại số điện thoại theo yêu cầu của HubSpot và thay thế số 0 đầu tiên bằng +49."""
+
+    # Loại bỏ các ký tự không phải số (nhưng giữ dấu + ở đầu nếu có)
+    digits_only = ''.join(filter(lambda x: x.isdigit() or x == '+', phone))
+
+    # Nếu số điện thoại bắt đầu với số 0, thay thế bằng +49
+    if digits_only.startswith('0'):
+        digits_only = '+49' + digits_only[1:]
+
+    # Trả về số đã định dạng, chỉ khi có đủ tối thiểu 7 chữ số
+    return digits_only if len(digits_only) >= 7 else ""
+
+
+def clean_phone_format(phone):
+    """Loại bỏ các ký tự đặc biệt như khoảng trắng, dấu gạch ngang, gạch chéo."""
+    # Xóa dấu gạch ngang, gạch chéo và khoảng trắng
+    cleaned_phone = phone.replace('-', '').replace('/', '').replace(' ', '')
+    return format_phone_number(cleaned_phone)
+
 
 def safe_extract(soup, label_text):
     """Trích xuất thông tin một cách an toàn dựa trên nhãn từ HTML."""
@@ -58,7 +72,7 @@ def extract_contact_info(soup):
         phone = contact_section.find('p', text=lambda t: t and 'Tel.' in t)
         if phone:
             raw_phone = clean_text(phone.get_text(strip=True).replace('Tel.', '').strip())
-            contact_info["Telefon"] = format_phone_number(raw_phone)
+            contact_info["Telefon"] = clean_phone_format(raw_phone)
 
         # Trích xuất email
         email = contact_section.find('a', href=lambda href: href and 'mailto:' in href)
@@ -120,7 +134,7 @@ def scrape_job_details(job_url):
             print(f"Lỗi timeout cho {job_url}: {e}")
             time.sleep(random.uniform(1, 5))  # Tạm dừng ngẫu nhiên trước khi thử lại
         except requests.exceptions.ConnectionError as e:
-            print(f"Thử lần {i+1} thất bại cho {job_url}: {e}")
+            print(f"Thử lần {i + 1} thất bại cho {job_url}: {e}")
             time.sleep(random.uniform(1, 5))  # Tạm dừng ngẫu nhiên trước khi thử lại
         except Exception as e:
             print(f"Lỗi bất ngờ cho {job_url}: {e}")
