@@ -7,6 +7,23 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import csv
 
+def close_popups(driver, wait):
+    """Hàm đóng các popup cookie và popup khác trên trang."""
+    try:
+        # Tìm và nhấp vào nút đồng ý cookie (nếu có)
+        accept_cookies_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Zustimmen' or text()='Accept' or text()='I agree']")))
+        accept_cookies_button.click()
+        print("Cookie popup closed.")
+    except:
+        print("No cookie popup found or unable to close cookie popup.")
+
+    try:
+        # Đóng các popup khác, ví dụ popup quảng cáo, đăng ký, v.v.
+        close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@class='close' or @aria-label='Close']")))
+        close_button.click()
+        print("Other popup closed.")
+    except:
+        print("No other popup found or unable to close other popup.")
 
 def get_contact_info(driver):
     """Hàm lấy thông tin liên hệ từ trang chi tiết công việc."""
@@ -33,6 +50,13 @@ def get_contact_info(driver):
             phone_number = [line for line in contact_fields.split('<br>') if '+49' in line][0].strip()
         except:
             phone_number = "N/A"
+
+        # Lấy email
+        try:
+            email = contact_container.find_element(By.XPATH, "//a[contains(@href, 'mailto:')]").get_attribute('href')
+            email = email.replace("mailto:", "")  # Loại bỏ 'mailto:'
+        except:
+            email = "N/A"
 
         # Lấy chính xác website
         try:
@@ -61,10 +85,9 @@ def get_contact_info(driver):
 
     except Exception as e:
         print(f"Error extracting contact info: {e}")
-        anrede, name, phone_number, website, address = "N/A", "N/A", "N/A", "N/A", "N/A"
+        anrede, name, phone_number, email, website, address = "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"
 
-    return anrede, name, phone_number, website, address
-
+    return anrede, name, phone_number, email, website, address
 
 def get_job_listings(url, output_file):
     # Sử dụng webdriver-manager để cài đặt và sử dụng ChromeDriver
@@ -77,13 +100,8 @@ def get_job_listings(url, output_file):
     # Đợi cho đến khi hộp tìm kiếm xuất hiện và sẵn sàng
     wait = WebDriverWait(driver, 10)
 
-    # Xử lý popup cookie (nếu có)
-    try:
-        accept_cookies_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Zustimmen']")))
-        accept_cookies_button.click()
-        print("Cookie popup closed.")
-    except:
-        print("No cookie popup found or unable to close cookie popup.")
+    # Đóng popup cookie và các popup khác (nếu có)
+    close_popups(driver, wait)
 
     # Nhập từ khóa "Auszubildende/r Hotelfachmann/frau"
     search_box_keyword = wait.until(EC.element_to_be_clickable((By.ID, 'taetigkeiten')))
@@ -102,16 +120,13 @@ def get_job_listings(url, output_file):
     time.sleep(5)  # Đợi một lúc để trang tải xong
 
     all_jobs = []
-    count = 0  # Đếm số công việc đã lấy
 
-    while count < 3:  # Chỉ lấy 3 kết quả
+    while True:  # Lặp qua tất cả các trang
         # Lấy danh sách công việc
         job_listings = driver.find_elements(By.CLASS_NAME, 'result_list_right')
 
         # Duyệt qua các công việc và mở URL công việc chi tiết
         for job in job_listings:
-            if count >= 3:  # Dừng lại sau khi lấy đủ 3 kết quả
-                break
             title = job.find_element(By.CLASS_NAME, 'job').text
             location = job.find_element(By.CLASS_NAME, 'location').text
 
@@ -129,26 +144,23 @@ def get_job_listings(url, output_file):
                 print(f"Timed out waiting for page to load: {job_link}")
 
             # Lấy thông tin liên hệ từ trang chi tiết công việc
-            anrede, name, phone_number, website, address = get_contact_info(driver)
+            anrede, name, phone_number, email, website, address = get_contact_info(driver)
 
             # Lưu thông tin vào danh sách
-            all_jobs.append([title, location, anrede, name, phone_number, website, address])
+            all_jobs.append([title, location, anrede, name, phone_number, email, website, address])
 
             # Đóng tab hiện tại và quay về tab chính
             driver.close()
             driver.switch_to.window(driver.window_handles[0])
 
-            count += 1  # Tăng biến đếm số công việc đã lấy
-
         # Kiểm tra xem có trang tiếp theo không
-        if count < 3:  # Chỉ tiếp tục nếu chưa đủ 3 kết quả
-            try:
-                next_page_button = driver.find_element(By.CLASS_NAME, 'weiter')
-                next_page_button.click()
-                time.sleep(5)  # Đợi trang tiếp theo tải
-            except:
-                print(f"No more pages found.")
-                break
+        try:
+            next_page_button = driver.find_element(By.CLASS_NAME, 'weiter')
+            next_page_button.click()
+            time.sleep(5)  # Đợi trang tiếp theo tải
+        except:
+            print("No more pages found.")
+            break
 
     # Đóng trình duyệt sau khi hoàn tất
     driver.quit()
@@ -156,12 +168,12 @@ def get_job_listings(url, output_file):
     # Lưu vào CSV với mã hóa UTF-8
     with open(output_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(["Job Title", "Location", "Anrede", "Name", "Phone Number", "Website", "Address"])
+        # Cập nhật tiêu đề các cột bằng tiếng Đức
+        writer.writerow(["Berufsbezeichnung", "Ort", "Anrede", "Name", "Telefonnummer", "E-Mail", "Webseite", "Adresse"])
         for job in all_jobs:
             writer.writerow(job)
 
     print(f"{len(all_jobs)} job listings have been saved to {output_file}")
-
 
 if __name__ == '__main__':
     # URL của trang
