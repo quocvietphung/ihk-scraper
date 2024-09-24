@@ -26,9 +26,11 @@ def get_contact_info(driver):
         except:
             contact_position = "N/A"
 
-        # Tìm chính xác số điện thoại bắt đầu bằng +49
+        # Tìm số điện thoại trong <div id='contact_fields'>
         try:
-            phone_number = contact_container.find_element(By.XPATH, "//div[@id='contact_fields']//text()[contains(., '+49')]").strip()
+            contact_fields = contact_container.find_element(By.ID, 'contact_fields').get_attribute('innerHTML')
+            # Tìm nội dung văn bản chứa số điện thoại bắt đầu bằng +49
+            phone_number = [line for line in contact_fields.split('<br>') if '+49' in line][0].strip()
         except:
             phone_number = "N/A"
 
