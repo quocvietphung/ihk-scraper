@@ -26,13 +26,15 @@ def get_contact_info(driver):
         except:
             contact_position = "N/A"
 
+        # Tìm chính xác số điện thoại bắt đầu bằng +49
         try:
-            phone_number = contact_container.find_element(By.XPATH, "//div[@id='contact_fields']").text.split("\n")[2]
+            phone_number = contact_container.find_element(By.XPATH, "//div[@id='contact_fields']//text()[contains(., '+49')]").strip()
         except:
             phone_number = "N/A"
 
+        # Lấy chính xác website
         try:
-            website = contact_container.find_element(By.XPATH, "//a[contains(@href, 'http')]").text
+            website = contact_container.find_element(By.XPATH, "//a[contains(@href, 'http')]").get_attribute('href')
         except:
             website = "N/A"
 
@@ -46,15 +48,14 @@ def get_contact_info(driver):
             address = "N/A"
 
         # Tách Anrede và tên riêng
+        anrede = ""
+        name = contact_name
         if 'Frau' in contact_name:
             anrede = 'Frau'
-            name = contact_name.replace('Frau ', '').strip()
+            name = contact_name.replace('Frau', '').strip()
         elif 'Herr' in contact_name:
             anrede = 'Herr'
-            name = contact_name.replace('Herr ', '').strip()
-        else:
-            anrede = ''
-            name = contact_name
+            name = contact_name.replace('Herr', '').strip()
 
     except Exception as e:
         print(f"Error extracting contact info: {e}")
@@ -150,7 +151,7 @@ def get_job_listings(url, output_file):
     # Đóng trình duyệt sau khi hoàn tất
     driver.quit()
 
-    # Lưu vào CSV
+    # Lưu vào CSV với mã hóa UTF-8
     with open(output_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow(["Job Title", "Location", "Anrede", "Name", "Phone Number", "Website", "Address"])
