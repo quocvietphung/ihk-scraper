@@ -23,6 +23,8 @@ def scrape_address(url):
         # Lấy toàn bộ văn bản trong contact_container
         contact_text = contact_container.text
 
+        print("Contact text:", contact_text)
+
         # Tách các dòng và trích xuất thông tin địa chỉ
         lines = contact_text.split('\n')
 

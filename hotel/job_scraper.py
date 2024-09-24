@@ -15,22 +15,52 @@ def get_contact_info(driver):
         wait = WebDriverWait(driver, 10)
         contact_container = wait.until(EC.visibility_of_element_located((By.ID, 'contact_container')))
 
-        # Lấy từng phần thông tin chi tiết từ contact_container
-        name = contact_container.find_element(By.XPATH, "//strong").text  # Tên công ty
-        phone_number = contact_container.find_element(By.XPATH, "//div[@id='contact_fields']").text.split("\n")[
-            0]  # Số điện thoại
-        email = contact_container.find_element(By.XPATH, "//a[contains(@href, 'mailto:')]").text  # Email
-        website = contact_container.find_element(By.XPATH, "//a[contains(@href, 'http')]").text  # Website
+        # Lấy thông tin liên hệ, nếu không tìm thấy sẽ gán giá trị "N/A"
+        try:
+            contact_name = contact_container.find_element(By.XPATH, "//span[@class='contact_name']").text
+        except:
+            contact_name = "N/A"
 
-        # Xử lý chuỗi văn bản để lấy địa chỉ đầy đủ từ các thẻ <br>
-        address_parts = contact_container.get_attribute("innerText").split("\n")
-        address = ' '.join(address_parts[1:3]).strip()  # Địa chỉ được lấy từ các dòng thứ 2 và 3
+        try:
+            contact_position = contact_container.find_element(By.XPATH, "//span[@class='contact_position']").text
+        except:
+            contact_position = "N/A"
+
+        try:
+            phone_number = contact_container.find_element(By.XPATH, "//div[@id='contact_fields']").text.split("\n")[2]
+        except:
+            phone_number = "N/A"
+
+        try:
+            website = contact_container.find_element(By.XPATH, "//a[contains(@href, 'http')]").text
+        except:
+            website = "N/A"
+
+        # Xử lý chuỗi văn bản để lấy địa chỉ
+        try:
+            address_lines = contact_container.text.split('\n')
+            street_address = address_lines[3]
+            postal_code_city = address_lines[4]
+            address = f"{street_address}, {postal_code_city}"
+        except:
+            address = "N/A"
+
+        # Tách Anrede và tên riêng
+        if 'Frau' in contact_name:
+            anrede = 'Frau'
+            name = contact_name.replace('Frau ', '').strip()
+        elif 'Herr' in contact_name:
+            anrede = 'Herr'
+            name = contact_name.replace('Herr ', '').strip()
+        else:
+            anrede = ''
+            name = contact_name
 
     except Exception as e:
         print(f"Error extracting contact info: {e}")
-        name, phone_number, email, website, address = "N/A", "N/A", "N/A", "N/A", "N/A"
+        anrede, name, phone_number, website, address = "N/A", "N/A", "N/A", "N/A", "N/A"
 
-    return name, phone_number, email, website, address
+    return anrede, name, phone_number, website, address
 
 
 def get_job_listings(url, output_file):
@@ -96,10 +126,10 @@ def get_job_listings(url, output_file):
                 print(f"Timed out waiting for page to load: {job_link}")
 
             # Lấy thông tin liên hệ từ trang chi tiết công việc
-            name, phone_number, email, website, address = get_contact_info(driver)
+            anrede, name, phone_number, website, address = get_contact_info(driver)
 
             # Lưu thông tin vào danh sách
-            all_jobs.append([title, location, name, phone_number, email, website, address])
+            all_jobs.append([title, location, anrede, name, phone_number, website, address])
 
             # Đóng tab hiện tại và quay về tab chính
             driver.close()
@@ -123,7 +153,7 @@ def get_job_listings(url, output_file):
     # Lưu vào CSV
     with open(output_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(["Job Title", "Location", "Name", "Phone Number", "Email", "Website", "Address"])
+        writer.writerow(["Job Title", "Location", "Anrede", "Name", "Phone Number", "Website", "Address"])
         for job in all_jobs:
             writer.writerow(job)
 
