@@ -165,7 +165,7 @@ def scrape_ihk_pages(base_url, output_csv, start_page=0, end_page=1356):
             "Angebots-Nr.", "Branche", "Unternehmen", "Stellenbeschreibung",
             "Schulabschluss wünschenswert", "gewünschte Vorqualifikation",
             "Beginn", "Angebotene Plätze", "Adresse", "Anrede", "Vorname", "Nachname",
-            "Telefonnumer", "Email", "Weitere Ausbildungsplatzangebote", "URL"
+            "Telefonnummer", "Email", "Weitere Ausbildungsplatzangebote", "URL"
         ])
 
         writer.writeheader()
