@@ -16,7 +16,7 @@ service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 # URL bạn cần lấy dữ liệu
-url = "https://www.ausbildung.de/suche/?form_main_search[what]=Pflegefachmann/-frau&form_main_search[radius]=1000"
+url = "https://www.ausbildung.de/berufe/pflegefachmann/stellen/#tab-bar-anchor"
 driver.get(url)
 
 # Đợi trang tải xong
