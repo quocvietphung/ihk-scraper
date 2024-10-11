@@ -178,7 +178,7 @@ def get_job_listings(url, output_file):
 if __name__ == '__main__':
     # URL của trang
     url = 'https://www.hotelcareer.de/jobs/stellenangebote'
-    output_file = 'job_listings.csv'
+    output_file = 'hotelfachmann.csv'
 
     # Gọi hàm để lấy danh sách công việc và lưu vào CSV
     get_job_listings(url, output_file)
