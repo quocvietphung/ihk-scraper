@@ -2,71 +2,73 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import time
 
+# Hàm cuộn xuống tới phần tử phân trang
+def scroll_to_pagination(driver):
+    pagination_bottom = driver.find_element(By.CLASS_NAME, "pagination-sorting-bottom")
+    driver.execute_script("arguments[0].scrollIntoView();", pagination_bottom)
+    time.sleep(2)
 
-# Hàm lấy thông tin chi tiết công việc
-def scrape_job_details(driver):
+# Hàm kiểm tra và nhấn vào nút chuyển trang bằng JavaScript
+def next_page_exists(driver):
     try:
-        job_details_container = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.flex.flex-col.lg\\:p-8'))
-        )
-        job_details = job_details_container.text
-        print("Job Details:", job_details)
-    except Exception as e:
-        print(f"Error scraping job details: {e}")
-
-
-# Hàm click vào từng phần tử công việc
-def click_job_offer(driver):
-    job_offers = driver.find_elements(By.CSS_SELECTOR, 'a[data-turbo="true"]')
-    for job in job_offers:
-        try:
-            # Cuộn đến phần tử trước khi click
-            driver.execute_script("arguments[0].scrollIntoView(true);", job)
-            time.sleep(1)  # Đợi một chút để đảm bảo phần tử đã cuộn vào khung nhìn
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable(job)).click()  # Đợi phần tử có thể click được và click
-            time.sleep(2)  # Đợi phần chi tiết tải
-            scrape_job_details(driver)  # Lấy chi tiết công việc
-        except Exception as e:
-            print(f"Error clicking job offer: {e}")
-
-
-# Hàm cuộn xuống và click vào nút "Next Page"
-def click_next_page(driver):
-    try:
-        next_page_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, '/html/body/main/div[1]/div/div[1]/div/div[4]/div[1]/nav/a[@rel="next"]'))
-        )
-        # Cuộn xuống để đảm bảo nút nằm trong viewport
-        driver.execute_script("arguments[0].scrollIntoView(true);", next_page_button)
-        time.sleep(1)
-        next_page_button.click()  # Click vào nút "Next Page"
-        time.sleep(3)  # Đợi trang tải
+        # Tìm nút chứa ký tự '›' để chuyển trang
+        next_button = driver.find_element(By.XPATH, '//a[contains(@href, "page=") and contains(., "›")]')
+        driver.execute_script("arguments[0].scrollIntoView();", next_button)  # Cuộn tới nút
+        driver.execute_script("arguments[0].click();", next_button)  # Nhấn vào nút bằng JavaScript
         return True
-    except Exception as e:
-        print(f"Error clicking next page: {e}")
+    except NoSuchElementException:
         return False
 
+# Hàm kiểm tra và nhấn vào nút "ERLAUBEN" nếu popup xuất hiện
+def allow_push_notifications(driver):
+    try:
+        # Tìm nút "ERLAUBEN" nếu popup xuất hiện
+        allow_button = driver.find_element(By.XPATH, '//button[contains(text(), "ERLAUBEN")]')
+        allow_button.click()  # Nhấn vào nút "ERLAUBEN"
+        print("Đã nhấn vào 'ERLAUBEN'.")
+    except NoSuchElementException:
+        print("Không có pop-up 'ERLAUBEN'.")
 
-# Hàm duyệt và chuyển trang liên tục
+# Hàm duyệt qua các trang và lấy chi tiết công việc
 def scrape_all_pages(driver):
     while True:
-        # Duyệt các công việc trong trang hiện tại
-        click_job_offer(driver)
+        try:
+            # Chờ các mục công việc xuất hiện
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "ci-search-result")))
 
-        # Sau khi duyệt xong, click vào nút "Next Page" nếu có, nếu không thì dừng lại
-        if not click_next_page(driver):
+            # Kiểm tra và nhấn vào "ERLAUBEN" nếu popup xuất hiện
+            allow_push_notifications(driver)
+
+            # Cuộn xuống tới phần phân trang
+            scroll_to_pagination(driver)
+
+            # Lấy danh sách các công việc
+            jobs = driver.find_elements(By.CLASS_NAME, "ci-search-result")
+
+            # In thông tin các công việc
+            for job in jobs:
+                job_title = job.find_element(By.CLASS_NAME, "vacancy__title").text
+                job_location = job.find_element(By.CLASS_NAME, "vacancy__location").text
+                job_url = job.find_element(By.CLASS_NAME, "vacancy__link").get_attribute("href")
+                print(f"Job Title: {job_title}, Location: {job_location}, URL: {job_url}")
+
+            # Tìm và nhấn nút chuyển trang
+            if not next_page_exists(driver):
+                print("Đã duyệt qua tất cả các trang.")
+                break
+
+        except TimeoutException:
+            print("Timeout khi chờ các phần tử công việc tải.")
             break
-
 
 # Khởi tạo trình duyệt
 driver = webdriver.Chrome()
 
 # Mở trang web
-driver.get("https://www.azubi.de/beruf/ausbildung-pflegefachfrau/ausbildungsplaetze")
+driver.get("https://jobs.ausbildungsheld.de/suchergebnisse?q=Ausbildung+Pflegefach&l=&r=25km&_multiselect_r=25km&a=&s=relevance&da=")
 
 # Duyệt qua tất cả các trang và lấy chi tiết công việc
 scrape_all_pages(driver)
