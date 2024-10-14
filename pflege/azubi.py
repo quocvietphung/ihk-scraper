@@ -32,6 +32,23 @@ def allow_push_notifications(driver):
     except NoSuchElementException:
         print("Không có pop-up 'ERLAUBEN'.")
 
+# Hàm lấy thông tin từ thẻ <div class="card-body"> có chứa thông tin liên hệ
+def get_contact_details(driver):
+    try:
+        # Tìm tất cả các thẻ <div class="card-body"> chứa thông tin liên hệ
+        card_bodies = driver.find_elements(By.CLASS_NAME, 'card-body')
+
+        for card_body in card_bodies:
+            # Kiểm tra nếu thẻ này chứa thông tin liên hệ với "Kontakt für Bewerber"
+            if "Kontakt für Bewerber" in card_body.text:
+                # In ra nội dung của thẻ <div class="card-body">
+                print("Thông tin liên hệ:")
+                print(card_body.text)
+                print("-" * 40)
+
+    except NoSuchElementException:
+        print("Không tìm thấy thẻ <div class='card-body'> với thông tin liên hệ.")
+
 # Hàm duyệt qua các trang và lấy chi tiết công việc
 def scrape_all_pages(driver):
     while True:
@@ -48,12 +65,23 @@ def scrape_all_pages(driver):
             # Lấy danh sách các công việc
             jobs = driver.find_elements(By.CLASS_NAME, "ci-search-result")
 
-            # In thông tin các công việc
+            # In thông tin các công việc và mở trang chi tiết
             for job in jobs:
                 job_title = job.find_element(By.CLASS_NAME, "vacancy__title").text
                 job_location = job.find_element(By.CLASS_NAME, "vacancy__location").text
                 job_url = job.find_element(By.CLASS_NAME, "vacancy__link").get_attribute("href")
                 print(f"Job Title: {job_title}, Location: {job_location}, URL: {job_url}")
+
+                # Mở trang chi tiết công việc và lấy thông tin liên hệ
+                driver.get(job_url)
+                time.sleep(2)  # Chờ trang tải
+
+                # Lấy thông tin từ thẻ <div class="card-body"> chứa thông tin liên hệ
+                get_contact_details(driver)
+
+                # Quay lại trang danh sách công việc
+                driver.back()
+                time.sleep(2)
 
             # Tìm và nhấn nút chuyển trang
             if not next_page_exists(driver):
