@@ -1,51 +1,57 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import re
+import time
 
-# Hàm lấy email từ trang web
-def scrape_email(driver, company_url):
+# Khởi tạo trình duyệt (ở đây sử dụng Chrome)
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")  # Chạy trong chế độ headless (không hiển thị trình duyệt)
+driver = webdriver.Chrome(options=options)
+
+# Truy cập vào URL
+url = 'https://jobs.ausbildungsheld.de/stellenangebot/ausbildung-zur-pflegefachfrau-zum-pflegefachmann-m-w-d-in-ingolstadt-9KF7MJ'
+driver.get(url)
+
+# Đợi một thời gian ngắn để đảm bảo trang đã tải đầy đủ
+time.sleep(2)
+
+# Tìm thẻ <div class="contact-value"> chứa thông tin liên hệ
+try:
+    contact_section = driver.find_element(By.CSS_SELECTOR, "div.contact-value")
+
+    # Lấy thông tin địa chỉ
     try:
-        driver.get(company_url)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        street_address = contact_section.find_element(By.CSS_SELECTOR, "div.street-address").text
+        postal_code = contact_section.find_element(By.CSS_SELECTOR, "span.postal-code").text
+        locality = contact_section.find_element(By.CSS_SELECTOR, "span.locality").text
+        country_name = contact_section.find_element(By.CSS_SELECTOR, "div.country-name").text
+        print("Địa chỉ:", f"{street_address}, {postal_code} {locality}, {country_name}")
+    except:
+        print("Không tìm thấy thông tin địa chỉ")
 
-        # Tìm tất cả các thẻ <a> có chứa email (href="mailto:...")
-        mailto_links = driver.find_elements(By.CSS_SELECTOR, 'a[href^="mailto:"]')
-        emails = [link.get_attribute('href').replace('mailto:', '') for link in mailto_links]
+    # Lấy thông tin website
+    try:
+        website = contact_section.find_element(By.CSS_SELECTOR, "div.website a").get_attribute("href")
+        print("Website:", website)
+    except:
+        print("Không tìm thấy thông tin Website")
 
-        # Nếu không tìm thấy email với mailto, tìm kiếm email trong văn bản trang
-        if not emails:
-            page_text = driver.find_element(By.TAG_NAME, "body").text
-            # Sử dụng regex để tìm email trong văn bản trang
-            emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", page_text)
+    # Lấy thông tin số điện thoại
+    try:
+        phone = contact_section.find_element(By.CSS_SELECTOR, "span.cs-content a").text
+        print("Số điện thoại:", phone)
+    except:
+        print("Không tìm thấy thông tin Số điện thoại")
 
-        if emails:
-            print(f"Emails found on {company_url}: {emails}")
-        else:
-            print(f"No email found on {company_url}")
-    except Exception as e:
-        print(f"Error retrieving email from {company_url}: {e}")
+    # Lấy thông tin email
+    try:
+        email = contact_section.find_element(By.CSS_SELECTOR, "div.email a").get_attribute("href")
+        email = email.replace("mailto:", "")  # Loại bỏ phần 'mailto:'
+        print("Email:", email)
+    except:
+        print("Không tìm thấy thông tin Email")
 
-# Khởi tạo trình duyệt
-driver = webdriver.Chrome()
+except Exception as e:
+    print("Không tìm thấy phần tử thẻ 'contact-value':", e)
 
-# Danh sách các công ty và URL của họ (cần cập nhật với các trang thực tế)
-companies = {
-    "Vivantes": "https://www.vivantes.de/",
-    "Charité": "https://www.charite.de/",
-    "Helios Kliniken": "https://www.helios-gesundheit.de/",
-    "St. Augustinus Gruppe": "https://www.st-augustinus-kliniken.de/",
-    "VIDACTA Schulen": "https://www.vidacta.de/",
-    "ProCurand": "https://www.procurand.de/",
-    "CBT Caritas": "https://www.cbt-gmbh.de/",
-    "ESO Education Group": "https://www.eso.de/",
-    "Justiz des Landes Nordrhein-Westfalen": "https://www.justiz.nrw.de/"
-}
-
-# Lấy email cho từng công ty
-for company, url in companies.items():
-    scrape_email(driver, url)
-
-# Đóng trình duyệt sau khi hoàn thành
+# Đóng trình duyệt sau khi thực thi xong
 driver.quit()
