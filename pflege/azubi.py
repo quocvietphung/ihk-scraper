@@ -13,7 +13,7 @@ def scroll_to_pagination(driver):
     time.sleep(2)
 
 
-# Hàm kiểm tra và nhấn vào nút chuyển trang bằng JavaScript, đồng thời in ra số trang
+# Hàm kiểm tra và nhấn vào nút chuyển trang bằng JavaScript
 def next_page_exists(driver, current_page):
     try:
         next_button = driver.find_element(By.XPATH, '//a[contains(@href, "page=") and contains(., "›")]')
@@ -43,30 +43,36 @@ def get_contact_info(url):
         'Website': 'N/A'
     }
 
-    # Lấy thông tin Name từ vị trí XPath đầu tiên
+    # Lấy thông tin Name
     try:
         name_element_1 = driver.find_element(By.XPATH,
                                              '/html/body/div[1]/div[3]/div/div[4]/div[1]/div[2]/div/div[2]/div/div[2]/div/div[2]/p')
         name_text = name_element_1.get_attribute('innerHTML')
         job_data['Name'] = name_text.split('<br>')[0].strip() if name_text else "N/A"
     except NoSuchElementException:
-        job_data['Name'] = "N/A"  # Đặt về "N/A" nếu không tìm thấy
+        job_data['Name'] = "N/A"
 
-    # Lấy thông tin Company từ thẻ chứa tên công ty
+    # Lấy thông tin Company
     try:
         company_element = driver.find_element(By.CSS_SELECTOR, 'div.contact-label')
         job_data['Company'] = company_element.text.strip()
     except NoSuchElementException:
         job_data['Company'] = "N/A"
 
-    # Lấy thông tin Branche từ thẻ <h1> với lớp cụ thể
+    # Lấy thông tin Branche từ thẻ <h1>
     try:
         branche_element = driver.find_element(By.CSS_SELECTOR, 'h1.page-title.th-page-title.js-page-title')
-        job_data['Branche'] = branche_element.text.strip()  # Lấy nội dung văn bản từ thẻ <h1>
+        branche_text = branche_element.text.strip()
+
+        # Logic so sánh để thiết lập giá trị cho Branche
+        if 'pflege' in branche_text.lower():  # Kiểm tra xem chuỗi có chứa từ "Pflege" không
+            job_data['Branche'] = 'Ausbildung zur Pflegefachkraft'  # Thay đổi ở đây
+        else:
+            job_data['Branche'] = branche_text  # Nếu không chứa, sử dụng giá trị lấy được từ thẻ <h1>
     except NoSuchElementException:
         job_data['Branche'] = "N/A"
 
-    # Lấy thông tin Email từ thẻ a chứa mailto:
+    # Lấy thông tin Email
     try:
         email_element = driver.find_element(By.CSS_SELECTOR, 'div.email a[href^="mailto:"]')
         email_full = email_element.get_attribute('href').replace('mailto:', '')
@@ -74,14 +80,14 @@ def get_contact_info(url):
     except NoSuchElementException:
         job_data['Email'] = "N/A"
 
-    # Lấy thông tin Telefon từ thẻ chứa số điện thoại
+    # Lấy thông tin Telefon
     try:
         telefon_element = driver.find_element(By.CSS_SELECTOR, "span.content-swap a[href^='tel:']")
         job_data['Telefon'] = telefon_element.get_attribute('href').replace('tel:', '')
     except NoSuchElementException:
         job_data['Telefon'] = "N/A"
 
-    # Lấy thông tin Website từ thẻ chứa link trang web
+    # Lấy thông tin Website
     try:
         website_element = driver.find_element(By.CSS_SELECTOR, 'div.website a')
         job_data['Website'] = website_element.get_attribute('href').strip()
