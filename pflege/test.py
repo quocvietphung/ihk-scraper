@@ -10,12 +10,21 @@ def get_contact_info(url):
 
     # Khởi tạo dictionary để lưu trữ thông tin
     job_data = {
-        'Company': '',  # Đổi 'Name' thành 'Company'
+        'Name': '',    # Thêm trường 'Name'
+        'Company': '',  # 'Name' đã đổi thành 'Company'
         'Branche': '',
         'Email': '',
         'Telefon': '',
         'Website': ''
     }
+
+    # Lấy thông tin Name từ vị trí XPath đầu tiên
+    try:
+        name_element_1 = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div/div[4]/div[1]/div[2]/div/div[2]/div/div[2]/div/div[2]/p')
+        name_text = name_element_1.get_attribute('innerHTML')  # Lấy HTML nội dung của thẻ <p>
+        job_data['Name'] = name_text.split('<br>')[0].strip()  # Lấy phần trước thẻ <br> và loại bỏ khoảng trắng thừa
+    except Exception as e:
+        print(f"Error getting Name from first XPath: {e}")
 
     # Lấy thông tin Company từ thẻ chứa tên công ty
     try:
