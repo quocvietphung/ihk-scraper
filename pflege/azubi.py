@@ -1,3 +1,4 @@
+import csv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -66,9 +67,9 @@ def get_contact_info(url):
 
         # Logic so sánh để thiết lập giá trị cho Branche
         if 'pflege' in branche_text.lower():  # Kiểm tra xem chuỗi có chứa từ "Pflege" không
-            job_data['Branche'] = 'Ausbildung zur Pflegefachkraft'  # Thay đổi ở đây
+            job_data['Branche'] = 'Ausbildung zur Pflegefachkraft'
         else:
-            job_data['Branche'] = branche_text  # Nếu không chứa, sử dụng giá trị lấy được từ thẻ <h1>
+            job_data['Branche'] = branche_text
     except NoSuchElementException:
         job_data['Branche'] = "N/A"
 
@@ -97,8 +98,28 @@ def get_contact_info(url):
     # In ra thông tin đã thu thập được
     print(job_data)
 
+    # Lưu thông tin vào file CSV nếu Email không phải là "N/A"
+    if job_data['Email'] != "N/A":
+        save_to_csv(job_data)
+
     # Đóng trình duyệt
     driver.quit()
+
+
+# Hàm lưu thông tin vào file CSV
+def save_to_csv(job_data):
+    filename = f"{job_data['Branche'].replace('/', '-')}.csv"  # Tạo tên file từ 'Branche'
+
+    # Mở file CSV và ghi thông tin
+    with open(filename, mode='a', newline='', encoding='utf-8') as csv_file:
+        fieldnames = job_data.keys()
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+        # Nếu file trống, ghi tiêu đề
+        if csv_file.tell() == 0:
+            writer.writeheader()
+
+        writer.writerow(job_data)
 
 
 # Hàm duyệt qua các trang và lấy chi tiết công việc
