@@ -5,11 +5,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import time
 
+
 # Hàm cuộn xuống tới phần tử phân trang
 def scroll_to_pagination(driver):
     pagination_bottom = driver.find_element(By.CLASS_NAME, "pagination-sorting-bottom")
     driver.execute_script("arguments[0].scrollIntoView();", pagination_bottom)
     time.sleep(2)
+
 
 # Hàm kiểm tra và nhấn vào nút chuyển trang bằng JavaScript, đồng thời in ra số trang
 def next_page_exists(driver, current_page):
@@ -22,9 +24,80 @@ def next_page_exists(driver, current_page):
     except NoSuchElementException:
         return False
 
+
+# Hàm lấy thông tin liên hệ từ trang chi tiết công việc
+def get_contact_info(url):
+    # Khởi động trình duyệt
+    driver = webdriver.Chrome()
+
+    # Mở trang web mục tiêu
+    driver.get(url)
+
+    # Khởi tạo dictionary để lưu trữ thông tin
+    job_data = {
+        'Name': '',
+        'Company': '',
+        'Branche': '',
+        'Email': '',
+        'Telefon': '',
+        'Website': ''
+    }
+
+    # Lấy thông tin Name từ vị trí XPath đầu tiên
+    try:
+        name_element_1 = driver.find_element(By.XPATH,
+                                             '/html/body/div[1]/div[3]/div/div[4]/div[1]/div[2]/div/div[2]/div/div[2]/div/div[2]/p')
+        name_text = name_element_1.get_attribute('innerHTML')
+        job_data['Name'] = name_text.split('<br>')[0].strip()
+    except Exception as e:
+        print(f"Error getting Name from first XPath: {e}")
+
+    # Lấy thông tin Company từ thẻ chứa tên công ty
+    try:
+        company_element = driver.find_element(By.CSS_SELECTOR, 'div.contact-label')
+        job_data['Company'] = company_element.text
+    except Exception as e:
+        print(f"Error getting Company: {e}")
+
+    # Lấy thông tin Branche từ thẻ chứa ngành nghề
+    try:
+        branche_element = driver.find_element(By.CSS_SELECTOR, 'div.contact-value a[href*="/branche/"]')
+        job_data['Branche'] = branche_element.text
+    except Exception as e:
+        print(f"Error getting Branche: {e}")
+
+    # Lấy thông tin Email từ thẻ a chứa mailto:
+    try:
+        email_element = driver.find_element(By.CSS_SELECTOR, 'div.email a[href^="mailto:"]')
+        email_full = email_element.get_attribute('href').replace('mailto:', '')
+        job_data['Email'] = email_full.split('?')[0]
+    except Exception as e:
+        print(f"Error getting Email: {e}")
+
+    # Lấy thông tin Telefon từ thẻ chứa số điện thoại
+    try:
+        telefon_element = driver.find_element(By.CSS_SELECTOR, "span.content-swap a[href^='tel:']")
+        job_data['Telefon'] = telefon_element.get_attribute('href').replace('tel:', '')
+    except Exception as e:
+        print(f"Error getting Telefon: {e}")
+
+    # Lấy thông tin Website từ thẻ chứa link trang web
+    try:
+        website_element = driver.find_element(By.CSS_SELECTOR, 'div.website a')
+        job_data['Website'] = website_element.get_attribute('href')
+    except Exception as e:
+        print(f"Error getting Website: {e}")
+
+    # In ra thông tin đã thu thập được
+    print(job_data)
+
+    # Đóng trình duyệt
+    driver.quit()
+
+
 # Hàm duyệt qua các trang và lấy chi tiết công việc
 def scrape_all_pages(driver):
-    current_page = 1  # Khởi tạo trang hiện tại là trang 1
+    current_page = 1
     print(f"Đang ở trang {current_page}")
 
     while True:
@@ -41,16 +114,19 @@ def scrape_all_pages(driver):
                 job_url = job.find_element(By.CLASS_NAME, "vacancy__link").get_attribute("href")
                 print(f"Job Title: {job_title}, Location: {job_location}, URL: {job_url}")
 
-            # Kiểm tra xem có trang tiếp theo không
+                # Gọi hàm get_contact_info để lấy thông tin liên hệ cho từng URL công việc
+                get_contact_info(job_url)
+
             if not next_page_exists(driver, current_page):
                 print("Đã duyệt qua tất cả các trang.")
                 break
 
-            current_page += 1  # Tăng số trang sau khi chuyển trang
+            current_page += 1
 
         except TimeoutException:
             print("Timeout khi chờ các phần tử công việc tải.")
             break
+
 
 # Khởi tạo trình duyệt
 driver = webdriver.Chrome()
